@@ -43,3 +43,97 @@
         <input id="roomInput" type="text" placeholder="Room Code" style="padding:10px;">
         <br><br>
         <button class="btn-join" onclick="joinRoom()">Join Game</button>
+    </div>
+
+    <div id="game" style="display:none">
+        <div class="status-bar">
+            <h2 id="current-card">Waiting for Players...</h2>
+            <div id="penalty-zone"></div>
+        </div>
+
+        <div id="table-area">
+            <div id="discard-pile"></div>
+        </div>
+
+        <hr style="opacity: 0.2; margin: 30px 0;">
+
+        <h3>Your Hand</h3>
+        <div id="hand"></div>
+        
+        <br>
+        <button class="btn-draw" onclick="drawCard()">Draw Card / Skip</button>
+        <button id="startBtn" onclick="startGame()" style="background:#3498db; color:white;">Start Game</button>
+    </div>
+
+    <div id="suitModal">
+        <h3>Choose New Suit</h3>
+        <button onclick="selectSuit('♥')">♥ Hearts</button>
+        <button onclick="selectSuit('♦')">♦ Diamonds</button>
+        <button onclick="selectSuit('♣')">♣ Clubs</button>
+        <button onclick="selectSuit('♠')">♠ Spades</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let myRoom = "";
+        let pendingAceIndex = null;
+
+        function joinRoom() {
+            const name = document.getElementById('nameInput').value;
+            myRoom = document.getElementById('roomInput').value;
+            if(!name || !myRoom) return alert("Fill in both boxes!");
+            
+            socket.emit('join-room', { roomId: myRoom, playerName: name });
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+        }
+
+        function startGame() {
+            socket.emit('start-game', myRoom);
+            document.getElementById('startBtn').style.display = 'none';
+        }
+
+        socket.on('game-state', (room) => {
+            const me = room.players.find(p => p.id === socket.id);
+            if(!me) return;
+
+            // Update Current Card on Table
+            document.getElementById('current-card').innerText = `Board: ${room.currentRank} of ${room.currentSuit}`;
+            
+            // Show Penalties (2s and Jack of Spades)
+            const penaltyZone = document.getElementById('penalty-zone');
+            penaltyZone.innerHTML = room.drawPenalty > 0 ? 
+                `<p class="penalty-glow">⚠️ PENALTY ACTIVE: DRAW ${room.drawPenalty} ⚠️</p>` : "";
+
+            // Display your cards
+            const handDiv = document.getElementById('hand');
+            handDiv.innerHTML = '';
+            me.hand.forEach((card, index) => {
+                const cardEl = document.createElement('div');
+                cardEl.className = `card ${['♥','♦'].includes(card.suit) ? 'red' : ''}`;
+                cardEl.innerHTML = `<span>${card.rank}</span><br><span>${card.suit}</span>`;
+                
+                cardEl.onclick = () => {
+                    if(card.rank === 'A') {
+                        pendingAceIndex = index;
+                        document.getElementById('suitModal').style.display = 'block';
+                    } else {
+                        socket.emit('play-card', { roomId: myRoom, cardIndex: index });
+                    }
+                };
+                handDiv.appendChild(cardEl);
+            });
+        });
+
+        function selectSuit(suit) {
+            socket.emit('play-card', { roomId: myRoom, cardIndex: pendingAceIndex, chosenSuit: suit });
+            document.getElementById('suitModal').style.display = 'none';
+        }
+
+        function drawCard() {
+            socket.emit('draw-card', myRoom);
+        }
+    </script>
+</body>
+</html>
