@@ -46,7 +46,6 @@ io.on('connection', (socket) => {
         sendPrivateState(roomId);
     });
 
-    // Handle "Last Card" announcement BEFORE playing
     socket.on('announce-last', (roomId) => {
         const room = rooms[roomId];
         const player = room.players.find(p => p.id === socket.id);
@@ -59,19 +58,21 @@ io.on('connection', (socket) => {
     socket.on('play-card', ({ roomId, cardIndex, chosenSuit }) => {
         const room = rooms[roomId];
         const player = room.players[room.turn];
-        if (socket.id !== player.id) return;
+        if (!room || socket.id !== player.id) return;
 
         const card = player.hand[cardIndex];
         
-        // Validation
-        const isAce = card.rank === 'A';
-        if (!isAce && card.suit !== room.currentSuit && card.rank !== room.currentRank) {
-            socket.emit('error-msg', "Illegal move!");
+        // --- UPDATED ACE VALIDATION ---
+        // An Ace can ONLY be played if it matches the current suit OR the current rank (another Ace)
+        const matchesSuit = card.suit === room.currentSuit;
+        const matchesRank = card.rank === room.currentRank;
+
+        if (!matchesSuit && !matchesRank) {
+            socket.emit('error-msg', `Illegal move! You can't play ${card.rank}${card.suit} on ${room.currentRank}${room.currentSuit}.`);
             return;
         }
 
-        // Logic for "Last Card" penalty
-        // If they have 2 cards and play one without announcing, they must draw 2
+        // --- LAST CARD PENALTY ---
         if (player.hand.length === 2 && !player.announcedLast) {
             socket.emit('error-msg', "Forgot to announce Last Card! +2 Penalty.");
             for(let i=0; i<2; i++) {
@@ -80,13 +81,13 @@ io.on('connection', (socket) => {
             }
         }
 
-        // Play the card
+        // Process the move
         player.hand.splice(cardIndex, 1);
         room.discardPile.push(card);
         room.currentRank = card.rank;
-        room.currentSuit = isAce ? chosenSuit : card.suit;
-
-        // Reset announcement after turn
+        
+        // If it's an Ace, use the chosen suit, otherwise use the card's natural suit
+        room.currentSuit = (card.rank === 'A') ? chosenSuit : card.suit;
         player.announcedLast = false;
 
         // Apply Card Rules
@@ -95,10 +96,8 @@ io.on('connection', (socket) => {
         
         let skip = (card.rank === '8') ? 2 : 1;
 
-        // King Logic (Reverse)
         if (card.rank === 'K') {
             room.direction *= -1;
-            // In 2 player game, King gives you another turn immediately
             if (room.players.length === 2) skip = 0; 
         }
 
@@ -115,7 +114,7 @@ io.on('connection', (socket) => {
     socket.on('draw-card', (roomId) => {
         const room = rooms[roomId];
         const player = room.players[room.turn];
-        if (socket.id !== player.id) return;
+        if (!room || socket.id !== player.id) return;
 
         const count = room.drawPenalty > 0 ? room.drawPenalty : 1;
         for(let i=0; i<count; i++) {
@@ -130,10 +129,13 @@ io.on('connection', (socket) => {
 
 function sendPrivateState(roomId) {
     const room = rooms[roomId];
+    if (!room) return;
     room.players.forEach((p) => {
         io.to(p.id).emit('game-state', {
             hand: p.hand,
             recentCards: room.discardPile.slice(-4),
+            currentSuit: room.currentSuit,
+            currentRank: room.currentRank,
             turnName: room.players[room.turn].name,
             isMyTurn: room.players[room.turn].id === p.id,
             penalty: room.drawPenalty,
@@ -154,10 +156,8 @@ function createDeck(c) {
 
 function reshuffle(room) {
     const top = room.discardPile.pop();
-    // Move all but the top card back to deck and shuffle
     room.deck = room.discardPile.sort(() => Math.random() - 0.5);
     room.discardPile = [top];
-    console.log("Deck exhausted. Reshuffling...");
 }
 
 http.listen(process.env.PORT || 3000);
