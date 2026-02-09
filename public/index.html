@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7 Cards Online</title>
+    <style>
+        /* DESIGN: Classic Green Felt Table */
+        body { background: #1a472a; color: white; font-family: sans-serif; text-align: center; margin: 0; }
+        #setup, #game { padding: 20px; }
+        
+        /* CARD STYLING */
+        .card { 
+            background: white; color: black; padding: 15px; margin: 8px; 
+            border-radius: 10px; display: inline-block; cursor: pointer; 
+            font-weight: bold; min-width: 50px; box-shadow: 2px 2px 10px rgba(0,0,0,0.5);
+            border: 2px solid #ccc;
+        }
+        .card:hover { transform: translateY(-5px); border-color: #fbff00; }
+        .red { color: #d12d2d; }
+        
+        /* UI ELEMENTS */
+        .status-bar { background: rgba(0,0,0,0.3); padding: 10px; margin-bottom: 20px; border-radius: 8px; }
+        .penalty-glow { color: #ffeb3b; font-weight: bold; }
+
+        /* MODALS */
+        #suitModal { 
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            background: #fff; color: #333; padding: 30px; border-radius: 15px; 
+            box-shadow: 0 0 50px rgba(0,0,0,0.8); display: none; z-index: 100;
+        }
+        button { padding: 12px 24px; margin: 10px; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; }
+        .btn-join { background: #2ecc71; color: white; }
+        .btn-draw { background: #e67e22; color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="setup">
+        <h1>🃏 7 Cards</h1>
+        <p>Enter a name and room code to start</p>
+        <input id="nameInput" type="text" placeholder="Your Name" style="padding:10px;">
+        <input id="roomInput" type="text" placeholder="Room Code" style="padding:10px;">
+        <br><br>
+        <button class="btn-join" onclick="joinRoom()">Join Game</button>
